@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zygo | Multi-vehicle booking for Harare</title>
+  <meta name="description" content="Zygo is a Harare-first booking app for people, goods, and vehicle hire with support for local payment methods including EcoCash.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="shell-header" id="shell-header">
+    <div class="container shell-nav">
+      <a href="#/" class="brand" aria-label="Zygo home">
+        <span class="brand-mark" aria-hidden="true">Z</span>
+        <span class="brand-copy">
+          <strong>Zygo</strong>
+          <span>Harare transport app</span>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <a href="#/">Home</a>
+        <a href="#/book">Book</a>
+        <a href="#/track">Track</a>
+        <a href="#/account">Account</a>
+      </nav>
+
+      <a href="#/book" class="header-cta">Start booking</a>
+    </div>
+  </header>
+
+  <main id="app-root" class="app-root" aria-live="polite"></main>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="#/" data-mobile-link="home">Home</a>
+    <a href="#/book" data-mobile-link="book">Book</a>
+    <a href="#/track" data-mobile-link="track">Track</a>
+    <a href="#/account" data-mobile-link="account">Account</a>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
