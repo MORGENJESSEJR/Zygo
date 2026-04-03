@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from zygo.api.main import app
+from api.main import app
 
 
 def sample_request() -> dict:

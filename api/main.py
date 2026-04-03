@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-from zygo.api.data import AREAS, PAYMENT_METHODS, STATUS_STAGES, VEHICLES, build_booking, build_quotes
+from api.data import AREAS, PAYMENT_METHODS, STATUS_STAGES, VEHICLES, build_booking, build_quotes
 
 
 class QuoteRequest(BaseModel):

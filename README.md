@@ -20,7 +20,8 @@ The folder is separate from `kweli/`.
 From `C:\Users\morge\Documents\New project`:
 
 ```powershell
-python -m uvicorn zygo.api.main:app --reload
+cd zygo
+python -m uvicorn api.main:app --reload
 ```
 
 Then open:
@@ -33,7 +34,8 @@ Then open:
 From `C:\Users\morge\Documents\New project`:
 
 ```powershell
-python -m unittest zygo.tests.test_api
+cd zygo
+python -m unittest tests.test_api
 ```
 
 ## Product logic
