@@ -130,6 +130,97 @@
     return state.bookingDraft[locationTextKey(fieldName)] || Data.getAreaLabel(state.bookingDraft[fieldName]) || 'Select area';
   }
 
+  function bookingModes() {
+    return [
+      { intent: 'move-me', code: 'R', label: 'Ride', copy: 'Private direct trip' },
+      { intent: 'shared-ride', code: 'S', label: 'Shared', copy: 'Choose an approved seat' },
+      { intent: 'move-goods', code: 'G', label: 'Goods', copy: 'Match the load to supply' },
+      { intent: 'hire-vehicle', code: 'H', label: 'Hire', copy: 'Reserve a vehicle by time' },
+    ];
+  }
+
+  function renderModeSelector(attributeName) {
+    return bookingModes().map((entry) => {
+      const active = state.bookingDraft.intent === entry.intent;
+      return `
+        <button type="button" class="task-tile${active ? ' is-active' : ''}" ${attributeName}="${entry.intent}">
+          <span class="task-tile-mark">${escapeHtml(entry.code)}</span>
+          <span class="task-tile-copy">
+            <strong>${escapeHtml(entry.label)}</strong>
+            <span>${escapeHtml(entry.copy)}</span>
+          </span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function quoteLabel(quote) {
+    if (quote.selectionType === 'offer') return 'Shared seat';
+    if (quote.selectionId === 'taxi' || quote.selectionId === 'sedan') return 'Private ride';
+    if (quote.selectionId === 'pickup' || quote.selectionId === 'truck' || quote.selectionId === 'cart') return 'Goods fit';
+    if (quote.selectionId === 'scooter') return 'Quick match';
+    return 'Live option';
+  }
+
+  function renderBookingCanvas(variant) {
+    const quote = selectedQuote() || state.quotes[0] || null;
+    const live = latestBooking();
+    const pickupLabel = draftAreaLabel('pickup');
+    const dropoffLabel = draftAreaLabel('dropoff');
+    const mode = serviceMeta(state.bookingDraft.intent);
+    const fareText = live
+      ? Data.formatMoney(live.quote.fareUsd)
+      : quote
+        ? Data.formatMoney(quote.fareUsd)
+        : 'Quote next';
+    const statusText = live
+      ? bookingStateMeta(live).label
+      : quote
+        ? `${quote.etaMinutes} min away`
+        : 'Waiting for route';
+    const actorText = live
+      ? `${live.driver.driverName} / ${live.driver.plateNumber}`
+      : quote && quote.driverPreview && quote.driverPreview.driverName
+        ? `${quote.driverPreview.driverName} / ${quote.driverPreview.plateNumber || 'verified'}`
+        : 'Zygo is ready to match the route';
+    const variantClass = variant ? ` map-surface-${variant}` : '';
+
+    return `
+      <div class="map-surface${variantClass}">
+        <div class="map-grid-overlay" aria-hidden="true"></div>
+        <div class="map-glow map-glow-a" aria-hidden="true"></div>
+        <div class="map-glow map-glow-b" aria-hidden="true"></div>
+        <span class="map-chip map-chip-top">${escapeHtml(mode.stat)}</span>
+        <span class="map-chip map-chip-right">${state.quotes.length ? `${state.quotes.length} options nearby` : 'Route staged'}</span>
+        <div class="map-node map-node-pickup">
+          <span class="map-node-mark">A</span>
+          <div>
+            <strong>${escapeHtml(pickupLabel)}</strong>
+            <span>Pickup</span>
+          </div>
+        </div>
+        <div class="map-route-ribbon" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="map-node map-node-dropoff">
+          <span class="map-node-mark">B</span>
+          <div>
+            <strong>${escapeHtml(dropoffLabel)}</strong>
+            <span>Dropoff</span>
+          </div>
+        </div>
+        <article class="map-summary-card">
+          <p>${escapeHtml(statusText)}</p>
+          <h3>${escapeHtml(fareText)}</h3>
+          <strong>${escapeHtml(actorText)}</strong>
+          <span>${escapeHtml(quote ? quoteLabel(quote) : mode.title)}</span>
+        </article>
+      </div>
+    `;
+  }
+
   function locationTextKey(fieldName) {
     return `${fieldName}Text`;
   }
@@ -376,59 +467,7 @@
   function renderHomeView() {
     const active = latestBooking();
     const supplyCount = state.driverProfiles.length;
-    const activeCard = active
-      ? `
-        <article class="market-card market-card-contrast">
-          <p class="section-kicker">Live trip</p>
-          <h3>${escapeHtml(active.driver.driverName)} is moving toward ${escapeHtml(active.dropoffLabel)}</h3>
-          <p>${escapeHtml(active.stateDetail)}</p>
-          <a href="#/track" class="inline-link">Open live safety panel</a>
-        </article>
-      `
-      : `
-        <article class="market-card market-card-contrast">
-          <p class="section-kicker">Live trip</p>
-          <h3>No active trip right now.</h3>
-          <p>Use the booking flow to set the route, compare supply, and keep the ride protected with start and end PIN checks.</p>
-          <a href="#/book" class="inline-link">Start booking</a>
-        </article>
-      `;
     const currentMode = serviceMeta(state.bookingDraft.intent);
-    const serviceCards = [
-      {
-        intent: 'move-me',
-        eyebrow: 'Ride now',
-        title: 'Direct trips around Harare',
-        copy: 'Immediate private rides with the fastest fit for standard city movement.',
-      },
-      {
-        intent: 'shared-ride',
-        eyebrow: 'Share fairly',
-        title: 'Approved commuter seats',
-        copy: 'Match onto real driver corridors and pay per seat instead of chartering the whole vehicle.',
-      },
-      {
-        intent: 'move-goods',
-        eyebrow: 'Move stock',
-        title: 'Goods-first route matching',
-        copy: 'Pick scooter, cart, pickup, or truck supply based on actual load instead of guesswork.',
-      },
-      {
-        intent: 'hire-vehicle',
-        eyebrow: 'Reserve time',
-        title: 'Hourly vehicle cover',
-        copy: 'Keep larger supply on standby for repeat drops, crews, or time-bound jobs.',
-      },
-    ].map((entry) => {
-      const activeIntent = state.bookingDraft.intent === entry.intent;
-      return `
-        <button type="button" class="service-card${activeIntent ? ' is-active' : ''}" data-home-intent="${entry.intent}">
-          <span class="service-kicker">${escapeHtml(entry.eyebrow)}</span>
-          <strong>${escapeHtml(entry.title)}</strong>
-          <span>${escapeHtml(entry.copy)}</span>
-        </button>
-      `;
-    }).join('');
     const routePresets = [
       { label: 'Mbare to town shared ride', pickup: 'mbare', dropoff: 'cbd', intent: 'shared-ride' },
       { label: 'Magaba stock run to Avondale', pickup: 'magaba', dropoff: 'avondale', intent: 'move-goods' },
@@ -439,163 +478,100 @@
         ${escapeHtml(preset.label)}
       </button>
     `).join('');
-    const corridorTags = Data.AREAS.map((area) => `<span class="hero-chip">${escapeHtml(area.label)}</span>`).join('');
+    const liveSummary = active
+      ? `${active.driver.driverName} / ${active.driver.plateNumber}`
+      : 'No active trip yet';
 
     return `
       <div class="page page-home">
-        <section class="hero-stage">
-          <div class="hero-copy hero-copy-xl">
-            <p class="section-kicker">Harare mobility marketplace</p>
-            <h1>One live front door for rides, shared seats, goods, and vehicle hire.</h1>
-            <p class="lede">Zygo combines dispatch demand with approved private supply so a rider can start with the job, compare the route fit, and only close the trip after a safe-arrival PIN confirmation.</p>
-            <div class="hero-chip-row">
-              <span class="hero-chip">Shared ride corridors</span>
-              <span class="hero-chip">Driver and vehicle onboarding</span>
-              <span class="hero-chip">Start PIN and end PIN</span>
-              <span class="hero-chip">EcoCash-ready flow</span>
+        <section class="app-landing">
+          <div class="launch-panel card">
+            <p class="section-kicker">Harare booking app</p>
+            <h1>Where to?</h1>
+            <p class="lede">Ride, share a seat, move goods, or hire a vehicle from one booking surface. Set the task first, then compare the live route fit.</p>
+            <div class="task-tile-grid">
+              ${renderModeSelector('data-home-intent')}
+            </div>
+            <div class="launch-route-card">
+              <div class="launch-route-stop">
+                <span class="location-marker is-resolved" aria-hidden="true">A</span>
+                <div>
+                  <strong>${escapeHtml(draftAreaLabel('pickup'))}</strong>
+                  <span>Pickup point</span>
+                </div>
+              </div>
+              <div class="launch-route-divider" aria-hidden="true"></div>
+              <div class="launch-route-stop">
+                <span class="location-marker is-resolved" aria-hidden="true">B</span>
+                <div>
+                  <strong>${escapeHtml(draftAreaLabel('dropoff'))}</strong>
+                  <span>Dropoff point</span>
+                </div>
+              </div>
+              <div class="launch-meta-row">
+                <span class="route-chip">${escapeHtml(currentMode.stat)}</span>
+                <span class="route-chip">${escapeHtml(paymentLabel(state.bookingDraft.paymentMethod))}</span>
+                <span class="route-chip">${state.quotes.length ? `${state.quotes.length} live options` : 'Quotes after route confirm'}</span>
+              </div>
+            </div>
+            <div class="preset-stack">
+              <span class="field-label">Quick route presets</span>
+              <div class="preset-row">${routePresets}</div>
             </div>
             <div class="hero-actions">
-              <button type="button" class="primary-btn" data-open-booking-flow>Plan a trip</button>
+              <button type="button" class="primary-btn" data-open-booking-flow>Open booking</button>
               <a href="#/drive" class="secondary-btn">Drive with Zygo</a>
-            </div>
-            <div class="hero-metrics">
-              <article class="metric-card">
-                <strong>4</strong>
-                <span>service modes in one booking system</span>
-              </article>
-              <article class="metric-card">
-                <strong>8</strong>
-                <span>Harare pickup and dropoff zones mapped into the app</span>
-              </article>
-              <article class="metric-card">
-                <strong>2-step</strong>
-                <span>trip closure using start and end PIN checks</span>
-              </article>
             </div>
           </div>
 
-          <aside class="hero-console">
-            <div class="hero-console-panel">
-              <div class="console-head">
-                <div>
-                  <p class="section-kicker">Live trip builder</p>
-                  <h2>${escapeHtml(currentMode.title)}</h2>
-                </div>
-                <span class="console-badge">${escapeHtml(currentMode.stat)}</span>
-              </div>
-              <p class="console-copy">${escapeHtml(currentMode.strap)}</p>
-              <div class="hero-route-stack">
-                <div class="hero-route-stop">
-                  <span class="location-marker is-resolved" aria-hidden="true">A</span>
-                  <div>
-                    <strong>${escapeHtml(draftAreaLabel('pickup'))}</strong>
-                    <span>Pickup zone</span>
-                  </div>
-                </div>
-                <div class="hero-route-line" aria-hidden="true"></div>
-                <div class="hero-route-stop">
-                  <span class="location-marker is-resolved" aria-hidden="true">B</span>
-                  <div>
-                    <strong>${escapeHtml(draftAreaLabel('dropoff'))}</strong>
-                    <span>Dropoff zone</span>
-                  </div>
-                </div>
-              </div>
-              <div class="service-grid service-grid-compact">
-                ${serviceCards}
-              </div>
-              <div class="preset-cluster">
-                <span class="preset-label">Try a route preset</span>
-                <div class="preset-row">${routePresets}</div>
-              </div>
-              <div class="hero-console-actions">
-                <button type="button" class="primary-btn" data-open-booking-flow>Open live booking</button>
-                <button type="button" class="secondary-btn" data-home-swap-route>Swap route</button>
-              </div>
+          <aside class="showcase-panel">
+            ${renderBookingCanvas('home')}
+            <div class="showcase-stack">
+              <article class="compact-info-card">
+                <span class="section-kicker">Current mode</span>
+                <strong>${escapeHtml(currentMode.title)}</strong>
+                <p>${escapeHtml(currentMode.strap)}</p>
+              </article>
+              <article class="compact-info-card">
+                <span class="section-kicker">Live safety</span>
+                <strong>Start PIN, end PIN, safety flag</strong>
+                <p>Trips only close after the rider confirms safe arrival.</p>
+              </article>
+              <article class="compact-info-card">
+                <span class="section-kicker">Latest activity</span>
+                <strong>${escapeHtml(liveSummary)}</strong>
+                <p>${active ? escapeHtml(active.stateDetail) : `${supplyCount} onboarded driver profile${supplyCount === 1 ? '' : 's'} linked to this account.`}</p>
+              </article>
             </div>
           </aside>
         </section>
 
-        <section class="market-strip">
-          <article class="market-card">
-            <p class="section-kicker">Current focus</p>
-            <h3>${escapeHtml(currentMode.title)}</h3>
-            <p>${escapeHtml(currentMode.detail)}</p>
+        <section class="utility-grid">
+          <article class="utility-card">
+            <span class="section-kicker">Choose supply</span>
+            <strong>Direct dispatch or approved shared seats</strong>
+            <p>Private supply stays protected behind review before it appears to riders.</p>
           </article>
-          <article class="market-card">
-            <p class="section-kicker">Supply linked</p>
-            <h3>${supplyCount} driver profile${supplyCount === 1 ? '' : 's'} on this account</h3>
-            <p>Every profile stores the driver, the car, the route corridor, and the review state before matching goes live.</p>
+          <article class="utility-card">
+            <span class="section-kicker">Move stock too</span>
+            <strong>Goods and vehicle hire use the same route logic</strong>
+            <p>You do not need a separate product just because the job changed.</p>
           </article>
-          ${activeCard}
-        </section>
-
-        <section class="feature-stage">
-          <div class="section-heading">
-            <p class="section-kicker">Why this feels like a real marketplace</p>
-            <h2>Task-first input on the left. Route trust on the right.</h2>
-          </div>
-          <div class="story-grid">
-            <article class="story-card">
-              <span class="story-index">01</span>
-              <h3>Start with the job, not the fleet.</h3>
-              <p>Riders decide whether they are moving themselves, their goods, or both before the supply layer opens up.</p>
-            </article>
-            <article class="story-card">
-              <span class="story-index">02</span>
-              <h3>Compare direct dispatch and shared seats.</h3>
-              <p>Private drivers can join the same marketplace, but only after onboarding and review approval.</p>
-            </article>
-            <article class="story-card">
-              <span class="story-index">03</span>
-              <h3>Keep the trip open until safe arrival.</h3>
-              <p>The rider confirms the car at pickup and confirms safe arrival at dropoff before the booking closes.</p>
-            </article>
-          </div>
-        </section>
-
-        <section class="corridor-stage card">
-          <div class="workbench-head">
-            <div>
-              <p class="section-kicker">Coverage map</p>
-              <h2>Harare zones already staged into the booking engine.</h2>
-            </div>
-            <span class="status-pill">Route-aware frontend</span>
-          </div>
-          <p class="lede">Typing a suburb, rank, or city zone now opens suggestion-driven pickup and dropoff selection instead of forcing riders through raw IDs.</p>
-          <div class="hero-chip-row corridor-chip-row">${corridorTags}</div>
-        </section>
-
-        <section class="trust-stage">
-          <div class="section-heading">
-            <p class="section-kicker">Trust and payment</p>
-            <h2>Built for a city where movement changes during the day.</h2>
-          </div>
-          <div class="trust-grid">
-            <article class="trust-card">
-              <strong>Verified matching</strong>
-              <p>Shared ride supply only shows up after a protected approval step, not as instant unreviewed inventory.</p>
-            </article>
-            <article class="trust-card">
-              <strong>Visible payment choice</strong>
-              <p>EcoCash, card, cash, and transfer stay visible based on the route and task instead of being buried late in the flow.</p>
-            </article>
-            <article class="trust-card">
-              <strong>Escalation built in</strong>
-              <p>The safety panel stays reachable throughout the trip so the rider can flag route or driver issues immediately.</p>
-            </article>
-          </div>
+          <article class="utility-card">
+            <span class="section-kicker">Track live</span>
+            <strong>Open the trip panel any time</strong>
+            <p>See driver state, raise a safety alert, and close the ride with the end PIN.</p>
+          </article>
         </section>
 
         <section class="home-foot card home-foot-cta">
           <div>
-            <p class="section-kicker">Final step</p>
-            <h2>Use the same frontend to ride, drive, or supervise the review queue.</h2>
+            <p class="section-kicker">Ready now</p>
+            <h2>Open the live booking surface and use it like the app itself.</h2>
           </div>
-          <div class="hero-chip-row">
-            <button type="button" class="primary-btn" data-open-booking-flow>Book with the live interface</button>
-            <a href="#/drive" class="secondary-btn">Open driver onboarding</a>
-            <a href="#/track" class="secondary-btn">Open trip safety</a>
+          <div class="hero-actions">
+            <button type="button" class="primary-btn" data-open-booking-flow>Book now</button>
+            <button type="button" class="secondary-btn" data-home-swap-route>Swap route</button>
           </div>
         </section>
       </div>
@@ -610,7 +586,7 @@
         ${imageOrFallback(preview.driverPhotoData, preview.driverName, 'avatar')}
         <div class="driver-preview-copy">
           <strong>${escapeHtml(preview.driverName)}</strong>
-          <span>${escapeHtml(preview.plateNumber || '')}${preview.seats ? ` / ${preview.seats} seats` : ''}</span>
+          <span>${escapeHtml(preview.plateNumber || 'Verified plate')}${preview.rating ? ` / ${preview.rating.toFixed(1)} rating` : ''}${preview.seats ? ` / ${preview.seats} seats` : ''}</span>
         </div>
       </div>
     `;
@@ -630,20 +606,23 @@
       const chosen = state.selectedChoice && quote.selectionType === state.selectedChoice.selectionType && quote.selectionId === state.selectedChoice.selectionId;
       return `
         <article class="quote-card${chosen ? ' selected' : ''}">
-          <div class="quote-head">
-            <div>
-              <p class="section-kicker">${escapeHtml(quote.vehicleName)}</p>
-              <h3>${Data.formatMoney(quote.fareUsd)}</h3>
-            </div>
+          <div class="quote-topline">
+            <span class="quote-kind">${escapeHtml(quoteLabel(quote))}</span>
             <span class="quote-meta">${quote.etaMinutes} min</span>
           </div>
-          ${renderDriverPreview(quote)}
-          <p>${escapeHtml(quote.fitReason)}</p>
-          <div class="quote-meta-row">
-            <span>${quote.distanceKm} km</span>
-            <span>${quote.paymentLabels.join(' / ')}</span>
+          <div class="quote-head">
+            <div>
+              <strong class="quote-title">${escapeHtml(quote.vehicleName)}</strong>
+              <p class="quote-copy">${escapeHtml(quote.fitReason)}</p>
+            </div>
+            <h3>${Data.formatMoney(quote.fareUsd)}</h3>
           </div>
-          <button type="button" class="secondary-btn" data-select-choice="${quote.selectionType}:${quote.selectionId}">${chosen ? 'Selected' : 'Choose this option'}</button>
+          ${renderDriverPreview(quote)}
+          <div class="quote-pill-row">
+            <span class="route-chip">${quote.distanceKm} km</span>
+            <span class="route-chip">${quote.paymentLabels.join(' / ')}</span>
+          </div>
+          <button type="button" class="secondary-btn quote-action-btn" data-select-choice="${quote.selectionType}:${quote.selectionId}">${chosen ? 'Selected' : 'Choose this option'}</button>
         </article>
       `;
     }).join('');
@@ -654,10 +633,10 @@
     if (!quote) return '';
 
     return `
-      <article class="review-card card">
+      <article class="review-card card review-card-cta">
         <div class="review-head">
           <div>
-            <p class="section-kicker">Review</p>
+            <p class="section-kicker">Selected option</p>
             <h3>${escapeHtml(quote.vehicleName)} from ${escapeHtml(draftAreaLabel('pickup'))} to ${escapeHtml(draftAreaLabel('dropoff'))}</h3>
           </div>
           <span class="status-pill">${Data.formatMoney(quote.fareUsd)}</span>
@@ -668,6 +647,11 @@
           <div><dt>Passengers</dt><dd>${state.bookingDraft.passengers}</dd></div>
           <div><dt>ETA</dt><dd>${quote.etaMinutes} min</dd></div>
         </dl>
+        <div class="booking-inline-summary">
+          <span class="route-chip">${escapeHtml(quoteLabel(quote))}</span>
+          <span class="route-chip">${escapeHtml(paymentLabel(state.bookingDraft.paymentMethod))}</span>
+          <span class="route-chip">End with rider PIN</span>
+        </div>
         <p class="review-copy">${escapeHtml(quote.fitReason)}</p>
         ${state.session ? '<button type="button" class="primary-btn" data-confirm-booking>Confirm booking</button>' : '<a href="#/auth?next=/book" class="primary-btn">Sign in to confirm</a>'}
       </article>
@@ -683,75 +667,36 @@
 
     return `
       <div class="page page-book">
-        <section class="booking-stage">
-          <div class="page-heading booking-stage-copy">
-            <div>
-              <p class="section-kicker">Booking flow</p>
-              <h1>Match the route to the right supply.</h1>
-              <p class="lede">Dispatch modes use platform inventory. Shared ride uses approved private drivers and their onboarded vehicles. The whole interface stays focused on route fit, payment clarity, and controlled trip closure.</p>
-            </div>
-          </div>
-          <aside class="booking-stage-panel">
-            <div class="booking-stage-top">
+        <section class="booking-app-stage">
+          <form class="card booking-app-card" id="quote-form">
+            <div class="booking-app-head">
               <div>
-                <p class="section-kicker">Current mode</p>
-                <h2>${escapeHtml(mode.title)}</h2>
+                <p class="section-kicker">Live booking</p>
+                <h1>Where to?</h1>
+                <p class="lede">${escapeHtml(mode.strap)}</p>
               </div>
-              <span class="console-badge">${escapeHtml(mode.stat)}</span>
-            </div>
-            <p class="console-copy">${escapeHtml(mode.strap)}</p>
-            <div class="booking-stage-grid">
-              <article>
-                <span>Route</span>
-                <strong>${escapeHtml(draftAreaLabel('pickup'))} to ${escapeHtml(draftAreaLabel('dropoff'))}</strong>
-              </article>
-              <article>
-                <span>Payment</span>
-                <strong>${escapeHtml(paymentLabel(draft.paymentMethod))}</strong>
-              </article>
-              <article>
-                <span>Safety</span>
-                <strong>Start PIN and end PIN</strong>
-              </article>
-              <article>
-                <span>Marketplace</span>
-                <strong>${isShared ? 'Approved private supply' : 'Dispatch-backed supply'}</strong>
-              </article>
-            </div>
-          </aside>
-        </section>
-
-        <div class="booking-layout booking-layout-premium">
-          <form class="card form-card booking-composer" id="quote-form">
-            <div class="composer-head">
-              <div>
-                <p class="section-kicker">Trip composer</p>
-                <h2>Set the route once and compare live fits.</h2>
-              </div>
-              <span class="status-pill">${isShared ? 'Rider choice first' : 'Fast dispatch logic'}</span>
-            </div>
-            <div class="field-block">
-              <label class="field-label">Transport task</label>
-              <div class="segmented-row segmented-row-wide">
-                <button type="button" class="segmented-pill${draft.intent === 'move-me' ? ' active' : ''}" data-intent="move-me">Move me</button>
-                <button type="button" class="segmented-pill${draft.intent === 'shared-ride' ? ' active' : ''}" data-intent="shared-ride">Shared ride</button>
-                <button type="button" class="segmented-pill${draft.intent === 'move-goods' ? ' active' : ''}" data-intent="move-goods">Move goods</button>
-                <button type="button" class="segmented-pill${draft.intent === 'hire-vehicle' ? ' active' : ''}" data-intent="hire-vehicle">Hire a vehicle</button>
-              </div>
+              <span class="status-pill">${escapeHtml(mode.stat)}</span>
             </div>
 
-            <div class="field-grid">
+            <div class="task-tile-grid task-tile-grid-book">
+              ${renderModeSelector('data-intent')}
+            </div>
+
+            <div class="booking-route-shell">
               <div class="field field-full location-stack">
                 ${renderLocationField('pickup', 'Pickup location', 'Start typing pickup area')}
                 <button type="button" class="location-swap" data-swap-route aria-label="Swap pickup and dropoff">Swap route</button>
                 ${renderLocationField('dropoff', 'Dropoff location', 'Where are you going?')}
               </div>
+            </div>
+
+            <div class="field-grid booking-config-grid">
               <label class="field">
                 <span>Schedule</span>
                 <select name="schedule">
-                  <option value="now"${draft.schedule === 'now' ? ' selected' : ''}>As soon as possible</option>
+                  <option value="now"${draft.schedule === 'now' ? ' selected' : ''}>Now</option>
                   <option value="today"${draft.schedule === 'today' ? ' selected' : ''}>Later today</option>
-                  <option value="later"${draft.schedule === 'later' ? ' selected' : ''}>Scheduled</option>
+                  <option value="later"${draft.schedule === 'later' ? ' selected' : ''}>Schedule it</option>
                 </select>
               </label>
               <label class="field">
@@ -792,9 +737,11 @@
               <textarea name="notes" rows="3" placeholder="Pickup landmark, stock details, or safety note">${escapeHtml(draft.notes)}</textarea>
             </label>
 
-            <div class="location-guidance">
-              <strong>Location suggestions stay manual for now.</strong>
-              <span>Type suburb names, market ranks, or city zones and choose the matching suggestion before loading quotes.</span>
+            <div class="booking-inline-summary">
+              <span class="route-chip">${escapeHtml(draftAreaLabel('pickup'))}</span>
+              <span class="route-chip">${escapeHtml(draftAreaLabel('dropoff'))}</span>
+              <span class="route-chip">${escapeHtml(paymentLabel(draft.paymentMethod))}</span>
+              <span class="route-chip">Start and end PIN</span>
             </div>
 
             <div class="composer-foot">
@@ -803,8 +750,9 @@
             </div>
           </form>
 
-          <aside class="booking-side booking-side-premium">
-            <section class="card side-panel quote-stage-panel">
+          <aside class="results-shell">
+            ${renderBookingCanvas('results')}
+            <section class="card quote-stack-card">
               <div class="side-head">
                 <div>
                   <p class="section-kicker">Available options</p>
@@ -812,16 +760,11 @@
                 </div>
                 <span class="status-pill">${isShared ? 'Manual driver approval' : 'Dispatch supply'}</span>
               </div>
-              <div class="quote-stage-banner">
-                <strong>${escapeHtml(draftAreaLabel('pickup'))}</strong>
-                <span></span>
-                <strong>${escapeHtml(draftAreaLabel('dropoff'))}</strong>
-              </div>
               <div class="quote-list">${renderQuoteCards()}</div>
             </section>
             ${renderReviewCard()}
           </aside>
-        </div>
+        </section>
       </div>
     `;
   }
