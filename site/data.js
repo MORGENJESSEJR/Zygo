@@ -5,14 +5,14 @@
   const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : window.location.origin;
 
   const AREAS = [
-    { id: 'mbare', label: 'Mbare Musika' },
-    { id: 'magaba', label: 'Magaba' },
-    { id: 'cbd', label: 'Harare CBD' },
-    { id: 'avondale', label: 'Avondale' },
-    { id: 'borrowdale', label: 'Borrowdale' },
-    { id: 'southerton', label: 'Southerton' },
-    { id: 'belvedere', label: 'Belvedere' },
-    { id: 'waterfalls', label: 'Waterfalls' },
+    { id: 'mbare', label: 'Mbare Musika', subtitle: 'Market rank and long-distance pickup zone', aliases: ['mbare', 'musika', 'market', 'rank'] },
+    { id: 'magaba', label: 'Magaba', subtitle: 'Industrial welding and workshops cluster', aliases: ['magaba', 'siyephambili', 'workshops'] },
+    { id: 'cbd', label: 'Harare CBD', subtitle: 'Town, Copacabana, First Street, Julius Nyerere', aliases: ['cbd', 'town', 'copacabana', 'first street', 'city centre'] },
+    { id: 'avondale', label: 'Avondale', subtitle: 'Shopping centre, medical, and residential stops', aliases: ['avondale', 'avondale shops'] },
+    { id: 'borrowdale', label: 'Borrowdale', subtitle: 'Village, Brooke, and northern residential route', aliases: ['borrowdale', 'sam levy', 'village', 'brooke'] },
+    { id: 'southerton', label: 'Southerton', subtitle: 'Factories and wholesale distribution corridor', aliases: ['southerton', 'industry', 'factories'] },
+    { id: 'belvedere', label: 'Belvedere', subtitle: 'Schools, sports club, and west-side housing', aliases: ['belvedere'] },
+    { id: 'waterfalls', label: 'Waterfalls', subtitle: 'High-density southern route and homes', aliases: ['waterfalls'] },
   ];
 
   const AREA_MAP = Object.fromEntries(AREAS.map((area) => [area.id, area]));
@@ -42,11 +42,50 @@
     { id: 'scooter', label: 'Scooter' },
   ];
 
+  function normalizeSearch(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function getAreaById(id) {
+    return AREA_MAP[id] || null;
+  }
+
+  function findAreaMatch(query) {
+    const normalized = normalizeSearch(query);
+    if (!normalized) return null;
+    return AREAS.find((area) => [area.label, ...(area.aliases || [])].some((term) => normalizeSearch(term) === normalized)) || null;
+  }
+
+  function searchAreas(query, options) {
+    const normalized = normalizeSearch(query);
+    const excludeId = options && options.excludeId ? options.excludeId : '';
+    return AREAS
+      .map((area, index) => {
+        if (area.id === excludeId) return null;
+        const terms = [area.label, area.subtitle || '', ...(area.aliases || [])].map(normalizeSearch);
+        if (!normalized) return { ...area, score: index };
+        if (normalizeSearch(area.label).startsWith(normalized)) return { ...area, score: 0 };
+        if ((area.aliases || []).some((alias) => normalizeSearch(alias).startsWith(normalized))) return { ...area, score: 1 };
+        if (terms.some((term) => term.includes(normalized))) return { ...area, score: 2 };
+        if (normalized.split(' ').every((token) => terms.some((term) => term.includes(token)))) return { ...area, score: 3 };
+        return null;
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.score - right.score)
+      .slice(0, 6)
+      .map(({ score, ...area }) => area);
+  }
+
   function defaultBookingDraft() {
     return {
       intent: 'move-me',
       pickup: 'mbare',
+      pickupText: 'Mbare Musika',
       dropoff: 'avondale',
+      dropoffText: 'Avondale',
       schedule: 'now',
       paymentMethod: 'ecocash',
       passengers: 1,
@@ -92,6 +131,14 @@
     };
   }
 
+  function normalizeBookingDraft(draft) {
+    const fallback = defaultBookingDraft();
+    const next = { ...fallback, ...(draft || {}) };
+    next.pickupText = next.pickupText || getAreaLabel(next.pickup);
+    next.dropoffText = next.dropoffText || getAreaLabel(next.dropoff);
+    return next;
+  }
+
   function loadState() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -100,7 +147,7 @@
       return {
         ...defaultState(),
         ...parsed,
-        bookingDraft: { ...defaultBookingDraft(), ...(parsed.bookingDraft || {}) },
+        bookingDraft: normalizeBookingDraft(parsed.bookingDraft || {}),
         driverDraft: { ...defaultDriverDraft(), ...(parsed.driverDraft || {}) },
         quotes: Array.isArray(parsed.quotes) ? parsed.quotes : [],
         bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
@@ -127,6 +174,20 @@
 
   function getAreaLabel(id) {
     return AREA_MAP[id] ? AREA_MAP[id].label : id;
+  }
+
+  function bookingRequestPayload(request) {
+    return {
+      intent: request.intent,
+      pickup: request.pickup,
+      dropoff: request.dropoff,
+      schedule: request.schedule,
+      paymentMethod: request.paymentMethod,
+      passengers: request.passengers,
+      loadLevel: request.loadLevel,
+      hireHours: request.hireHours,
+      notes: request.notes,
+    };
   }
 
   async function apiRequest(base, path, options) {
@@ -168,14 +229,17 @@
   }
 
   async function requestQuotes(base, request) {
-    return apiRequest(base, '/quotes', payload(request));
+    return apiRequest(base, '/quotes', payload(bookingRequestPayload(request)));
   }
 
   async function createBooking(base, session, request) {
     return apiRequest(base, '/bookings', {
       method: 'POST',
       headers: authHeaders(session),
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        ...request,
+        request: bookingRequestPayload(request.request),
+      }),
     });
   }
 
@@ -260,6 +324,9 @@
     saveState,
     formatMoney,
     getAreaLabel,
+    getAreaById,
+    findAreaMatch,
+    searchAreas,
     registerUser,
     loginUser,
     requestQuotes,

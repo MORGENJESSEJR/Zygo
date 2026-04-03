@@ -92,6 +92,83 @@
     return method ? method.label : methodId;
   }
 
+  function locationTextKey(fieldName) {
+    return `${fieldName}Text`;
+  }
+
+  function oppositeLocationField(fieldName) {
+    return fieldName === 'pickup' ? 'dropoff' : 'pickup';
+  }
+
+  function selectedLocation(fieldName) {
+    return Data.getAreaById(state.bookingDraft[fieldName]);
+  }
+
+  function locationSupportCopy(fieldName) {
+    const area = selectedLocation(fieldName);
+    if (area) return area.subtitle || `${area.label} selected.`;
+    return fieldName === 'pickup'
+      ? 'Type a suburb, rank, or corridor and choose the pickup suggestion.'
+      : 'Type the destination area and confirm it from the suggestion list.';
+  }
+
+  function getLocationSuggestions(fieldName) {
+    return Data.searchAreas(state.bookingDraft[locationTextKey(fieldName)], {
+      excludeId: state.bookingDraft[oppositeLocationField(fieldName)],
+    });
+  }
+
+  function renderLocationSuggestions(fieldName) {
+    const suggestions = getLocationSuggestions(fieldName);
+    if (!suggestions.length) {
+      return `
+        <div class="location-empty">
+          <strong>No nearby match yet.</strong>
+          <span>Try a suburb, rank, or city zone like Copacabana or Borrowdale.</span>
+        </div>
+      `;
+    }
+
+    return suggestions.map((area) => `
+      <button type="button" class="location-option" data-location-option="${fieldName}" data-area-id="${area.id}">
+        <span class="location-option-mark">${fieldName === 'pickup' ? 'A' : 'B'}</span>
+        <span class="location-option-copy">
+          <strong>${escapeHtml(area.label)}</strong>
+          <span>${escapeHtml(area.subtitle || 'Verified route point')}</span>
+        </span>
+      </button>
+    `).join('');
+  }
+
+  function renderLocationField(fieldName, label, placeholder) {
+    const textKey = locationTextKey(fieldName);
+    const selected = selectedLocation(fieldName);
+    return `
+      <div class="field location-field" data-location-field="${fieldName}">
+        <span>${label}</span>
+        <input type="hidden" name="${fieldName}" value="${escapeHtml(state.bookingDraft[fieldName] || '')}">
+        <div class="location-input-shell">
+          <span class="location-marker${selected ? ' is-resolved' : ''}" aria-hidden="true">${fieldName === 'pickup' ? 'A' : 'B'}</span>
+          <input
+            type="text"
+            value="${escapeHtml(state.bookingDraft[textKey] || '')}"
+            placeholder="${escapeHtml(placeholder)}"
+            autocomplete="off"
+            spellcheck="false"
+            data-location-input="${fieldName}"
+          >
+        </div>
+        <div class="location-meta">
+          <p class="field-support" data-location-support="${fieldName}">${escapeHtml(locationSupportCopy(fieldName))}</p>
+          <span class="location-confirmed${selected ? '' : ' is-muted'}" data-location-confirmed="${fieldName}">${selected ? 'Selected' : 'Choose from suggestions'}</span>
+        </div>
+        <div class="location-suggestions" data-location-suggestions="${fieldName}">
+          ${renderLocationSuggestions(fieldName)}
+        </div>
+      </div>
+    `;
+  }
+
   function initials(name) {
     return String(name || 'Z')
       .split(' ')
@@ -166,6 +243,95 @@
       reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
       reader.onerror = () => reject(new Error('Unable to read image file.'));
       reader.readAsDataURL(file);
+    });
+  }
+
+  function closeLocationFields(exceptFieldName) {
+    root.querySelectorAll('[data-location-field]').forEach((field) => {
+      if (!(field instanceof HTMLElement)) return;
+      if (field.dataset.locationField === exceptFieldName) return;
+      field.classList.remove('is-open');
+    });
+  }
+
+  function openLocationField(fieldName) {
+    closeLocationFields(fieldName);
+    const field = root.querySelector(`[data-location-field="${fieldName}"]`);
+    if (field instanceof HTMLElement) field.classList.add('is-open');
+  }
+
+  function syncLocationField(fieldName) {
+    const field = root.querySelector(`[data-location-field="${fieldName}"]`);
+    if (!(field instanceof HTMLElement)) return;
+
+    const selected = selectedLocation(fieldName);
+    const hiddenInput = field.querySelector(`input[type="hidden"][name="${fieldName}"]`);
+    const visibleInput = field.querySelector(`[data-location-input="${fieldName}"]`);
+    const marker = field.querySelector('.location-marker');
+    const support = field.querySelector(`[data-location-support="${fieldName}"]`);
+    const confirmed = field.querySelector(`[data-location-confirmed="${fieldName}"]`);
+    const suggestions = field.querySelector(`[data-location-suggestions="${fieldName}"]`);
+
+    if (hiddenInput instanceof HTMLInputElement) hiddenInput.value = state.bookingDraft[fieldName] || '';
+    if (visibleInput instanceof HTMLInputElement && visibleInput.value !== state.bookingDraft[locationTextKey(fieldName)]) {
+      visibleInput.value = state.bookingDraft[locationTextKey(fieldName)] || '';
+    }
+    if (marker instanceof HTMLElement) marker.classList.toggle('is-resolved', Boolean(selected));
+    if (support instanceof HTMLElement) support.textContent = locationSupportCopy(fieldName);
+    if (confirmed instanceof HTMLElement) {
+      confirmed.textContent = selected ? 'Selected' : 'Choose from suggestions';
+      confirmed.classList.toggle('is-muted', !selected);
+    }
+    if (suggestions instanceof HTMLElement) suggestions.innerHTML = renderLocationSuggestions(fieldName);
+  }
+
+  function syncLocationFields() {
+    syncLocationField('pickup');
+    syncLocationField('dropoff');
+  }
+
+  function silentlyUpdateBookingDraft(patch) {
+    state = {
+      ...state,
+      bookingDraft: {
+        ...state.bookingDraft,
+        ...patch,
+      },
+    };
+    persist();
+  }
+
+  function chooseSuggestedArea(fieldName, areaId) {
+    const area = Data.getAreaById(areaId);
+    if (!area) return;
+
+    commit({
+      ...state,
+      bookingDraft: {
+        ...state.bookingDraft,
+        [fieldName]: area.id,
+        [locationTextKey(fieldName)]: area.label,
+      },
+      quotes: [],
+      selectedChoice: null,
+    });
+
+    if (fieldName === 'pickup') {
+      window.requestAnimationFrame(() => {
+        const nextInput = root.querySelector('[data-location-input="dropoff"]');
+        if (nextInput instanceof HTMLInputElement) nextInput.focus();
+      });
+    }
+  }
+
+  function focusLocationField(fieldName) {
+    window.requestAnimationFrame(() => {
+      const input = root.querySelector(`[data-location-input="${fieldName}"]`);
+      if (input instanceof HTMLInputElement) {
+        input.focus();
+        input.select();
+      }
+      openLocationField(fieldName);
     });
   }
 
@@ -364,14 +530,11 @@
             </div>
 
             <div class="field-grid">
-              <label class="field">
-                <span>Pickup area</span>
-                <select name="pickup">${areaOptions(draft.pickup)}</select>
-              </label>
-              <label class="field">
-                <span>Dropoff area</span>
-                <select name="dropoff">${areaOptions(draft.dropoff)}</select>
-              </label>
+              <div class="field field-full location-stack">
+                ${renderLocationField('pickup', 'Pickup location', 'Start typing pickup area')}
+                <button type="button" class="location-swap" data-swap-route aria-label="Swap pickup and dropoff">Swap route</button>
+                ${renderLocationField('dropoff', 'Dropoff location', 'Where are you going?')}
+              </div>
               <label class="field">
                 <span>Schedule</span>
                 <select name="schedule">
@@ -413,10 +576,15 @@
               <div class="segmented-row">${paymentOptions(draft.intent, draft.paymentMethod)}</div>
             </div>
 
-            <label class="field field-full">
+            <label class="field">
               <span>Trip notes</span>
               <textarea name="notes" rows="3" placeholder="Pickup landmark, stock details, or safety note">${escapeHtml(draft.notes)}</textarea>
             </label>
+
+            <div class="location-guidance">
+              <strong>Location suggestions stay manual for now.</strong>
+              <span>Type suburb names, market ranks, or city zones and choose the matching suggestion before loading quotes.</span>
+            </div>
 
             <button type="submit" class="primary-btn">${isShared ? 'Find shared rides' : 'Get quotes'}</button>
           </form>
@@ -884,10 +1052,23 @@
   async function handleQuoteSubmit(form) {
     try {
       const formData = new FormData(form);
+      if (!state.bookingDraft.pickup) {
+        notify('Choose the pickup from suggestions first.');
+        focusLocationField('pickup');
+        return;
+      }
+      if (!state.bookingDraft.dropoff) {
+        notify('Choose the dropoff from suggestions first.');
+        focusLocationField('dropoff');
+        return;
+      }
+
       const nextDraft = {
         ...state.bookingDraft,
-        pickup: String(formData.get('pickup')),
-        dropoff: String(formData.get('dropoff')),
+        pickup: state.bookingDraft.pickup,
+        pickupText: Data.getAreaLabel(state.bookingDraft.pickup),
+        dropoff: state.bookingDraft.dropoff,
+        dropoffText: Data.getAreaLabel(state.bookingDraft.dropoff),
         schedule: String(formData.get('schedule')),
         paymentMethod: state.bookingDraft.paymentMethod,
         passengers: Number(formData.get('passengers')),
@@ -1011,6 +1192,29 @@
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
 
+    const locationOption = target.closest('[data-location-option]');
+    if (locationOption instanceof HTMLElement) {
+      chooseSuggestedArea(locationOption.dataset.locationOption, locationOption.dataset.areaId);
+      return;
+    }
+
+    if (target.closest('[data-swap-route]')) {
+      commit({
+        ...state,
+        bookingDraft: {
+          ...state.bookingDraft,
+          pickup: state.bookingDraft.dropoff,
+          pickupText: state.bookingDraft.dropoffText,
+          dropoff: state.bookingDraft.pickup,
+          dropoffText: state.bookingDraft.pickupText,
+        },
+        quotes: [],
+        selectedChoice: null,
+      });
+      window.requestAnimationFrame(syncLocationFields);
+      return;
+    }
+
     const intentTrigger = target.closest('[data-intent]');
     if (intentTrigger instanceof HTMLElement) {
       commit({
@@ -1092,7 +1296,45 @@
       commit({ ...state, session: null, bookings: [], driverProfiles: [], reviewQueue: [], activeBookingId: null });
       notify('Session cleared.');
       navigate('/');
+      return;
     }
+
+    if (!target.closest('[data-location-field]')) {
+      closeLocationFields();
+    }
+  });
+
+  document.addEventListener('focusin', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const locationField = target.closest('[data-location-field]');
+    if (locationField instanceof HTMLElement) {
+      openLocationField(locationField.dataset.locationField);
+      return;
+    }
+
+    closeLocationFields();
+  });
+
+  document.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.dataset.locationInput) return;
+
+    const fieldName = target.dataset.locationInput;
+    const exactMatch = Data.findAreaMatch(target.value);
+    silentlyUpdateBookingDraft({
+      [fieldName]: exactMatch ? exactMatch.id : '',
+      [locationTextKey(fieldName)]: target.value,
+    });
+    openLocationField(fieldName);
+    syncLocationFields();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    closeLocationFields();
   });
 
   document.addEventListener('submit', (event) => {

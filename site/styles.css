@@ -400,6 +400,10 @@ textarea:focus-visible {
   grid-template-columns: 1fr;
 }
 
+.field-full {
+  grid-column: 1 / -1;
+}
+
 .field span,
 .field-label,
 .review-grid dt,
@@ -426,6 +430,11 @@ textarea:focus-visible {
   resize: vertical;
 }
 
+.field-support {
+  color: var(--ink-700);
+  font-size: 0.84rem;
+}
+
 .field.is-muted {
   opacity: 0.55;
 }
@@ -439,6 +448,163 @@ textarea:focus-visible {
 .field-inline input {
   width: 18px;
   height: 18px;
+}
+
+.location-stack {
+  gap: 12px;
+}
+
+.location-field {
+  position: relative;
+}
+
+.location-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  transition: border-color var(--t1), box-shadow var(--t1), background var(--t1);
+}
+
+.location-field.is-open .location-input-shell,
+.location-field:focus-within .location-input-shell {
+  border-color: rgba(15, 107, 71, 0.24);
+  box-shadow: 0 0 0 4px rgba(15, 107, 71, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.location-input-shell input {
+  min-height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.location-input-shell input:focus-visible {
+  outline: 0;
+}
+
+.location-marker,
+.location-option-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(20, 32, 24, 0.08);
+  color: var(--ink-900);
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.location-marker.is-resolved {
+  background: rgba(15, 107, 71, 0.16);
+  color: var(--primary-500);
+}
+
+.location-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.location-confirmed {
+  color: var(--primary-500);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.location-confirmed.is-muted {
+  color: var(--ink-700);
+}
+
+.location-suggestions {
+  display: none;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 34px rgba(20, 32, 24, 0.08);
+}
+
+.location-field.is-open .location-suggestions,
+.location-field:focus-within .location-suggestions {
+  display: grid;
+}
+
+.location-option {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(252, 248, 241, 0.9);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t1), transform var(--t1), background var(--t1);
+}
+
+.location-option:hover {
+  border-color: rgba(15, 107, 71, 0.24);
+  background: rgba(15, 107, 71, 0.08);
+  transform: translateY(-1px);
+}
+
+.location-option-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.location-option-copy span,
+.location-empty span,
+.location-guidance span {
+  color: var(--ink-700);
+  font-size: 0.88rem;
+}
+
+.location-empty,
+.location-guidance {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(20, 32, 24, 0.16);
+  border-radius: 18px;
+  background: rgba(252, 248, 241, 0.66);
+}
+
+.location-guidance {
+  margin-top: 6px;
+}
+
+.location-swap {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--t1), background var(--t1), transform var(--t1);
+}
+
+.location-swap:hover {
+  border-color: rgba(15, 107, 71, 0.24);
+  background: rgba(15, 107, 71, 0.08);
+  transform: translateY(-1px);
 }
 
 .quote-card,
