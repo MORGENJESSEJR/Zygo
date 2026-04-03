@@ -363,7 +363,8 @@ textarea:focus-visible {
 .home-grid,
 .field-grid,
 .quote-list,
-.history-list {
+.history-list,
+.booking-list {
   display: grid;
   gap: 16px;
 }
@@ -429,6 +430,17 @@ textarea:focus-visible {
   opacity: 0.55;
 }
 
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-inline input {
+  width: 18px;
+  height: 18px;
+}
+
 .quote-card,
 .history-row {
   display: grid;
@@ -442,6 +454,83 @@ textarea:focus-visible {
 .inline-link {
   color: var(--primary-500);
   font-weight: 700;
+}
+
+.driver-preview,
+.profile-media-row,
+.booking-list-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.driver-preview-copy,
+.profile-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.driver-preview-copy {
+  flex: 1;
+  flex-direction: column;
+}
+
+.avatar,
+.profile-avatar,
+.profile-car,
+.media-fallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.profile-car {
+  width: 72px;
+}
+
+.media-fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(15, 107, 71, 0.12);
+  color: var(--ink-950);
+  font-weight: 700;
+}
+
+.profile-card,
+.safety-card,
+.booking-list-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.profile-head {
+  align-items: start;
+}
+
+.safety-card {
+  margin-top: 20px;
+}
+
+.alert-card {
+  border-color: rgba(199, 106, 26, 0.36);
+  background: rgba(199, 106, 26, 0.08);
+}
+
+.booking-list-card {
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t1), background var(--t1);
+}
+
+.booking-list-card.active {
+  border-color: rgba(15, 107, 71, 0.28);
+  background: rgba(15, 107, 71, 0.08);
 }
 
 .quote-card.selected {
@@ -544,7 +633,7 @@ textarea:focus-visible {
   inset: auto 12px 12px;
   z-index: 18;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   padding: 8px;
   border: 1px solid rgba(20, 32, 24, 0.1);
@@ -572,7 +661,8 @@ textarea:focus-visible {
   .home-grid,
   .field-grid,
   .quote-list,
-  .account-grid {
+  .account-grid,
+  .booking-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

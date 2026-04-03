@@ -3,6 +3,7 @@
 Zygo is a standalone Harare-first product prototype for booking:
 
 - city rides
+- shared rides with approved private drivers
 - goods movement
 - vehicle hire
 
@@ -10,9 +11,9 @@ The folder is separate from `kweli/`.
 
 ## What is here
 
-- `site/`: mobile-first web app prototype with client-side routes for home, booking, tracking, account, and auth
-- `api/`: FastAPI scaffold for auth, quotes, payments, areas, vehicles, and bookings
-- `tests/`: API smoke tests using `unittest`
+- `site/`: mobile-first web app with home, booking, driver onboarding, trip tracking, account, and auth routes
+- `api/`: FastAPI app for auth, quotes, driver review, bookings, and safety checkpoints
+- `tests/`: `unittest` coverage for booking, approval, and safety flows
 - `BRAND.md`: refined product brief and design logic
 
 ## Run the app locally
@@ -43,10 +44,25 @@ python -m unittest tests.test_api
 The main product choice is task-first routing:
 
 1. Move me
-2. Move goods
-3. Hire a vehicle
+2. Shared ride
+3. Move goods
+4. Hire a vehicle
 
 That reduces the real bottleneck: users should not have to decode the full fleet before they know which vehicles fit the job.
+
+## Marketplace flows
+
+- Riders can request dispatch rides, goods delivery, vehicle hire, or shared rides.
+- Private drivers can create driver and vehicle profiles with plate number, route corridor, and both photos.
+- New driver supply stays in `pending-review` until a reviewer approves it.
+- Trip safety uses a start PIN and end PIN before a booking can be completed.
+
+## Demo reviewer
+
+Shared-ride approval is protected. Use this seeded reviewer account if you want to test the review queue locally or on Railway:
+
+- Phone: `+263770000001`
+- Password: `review123`
 
 ## Railway
 
